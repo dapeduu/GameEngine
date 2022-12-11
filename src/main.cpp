@@ -46,12 +46,19 @@ class Entity
 {
 	std::shared_ptr<sf::Shape> m_shape;
 	sf::Vector2f m_velocity;
+	sf::Text m_name;
 
 public:
-	Entity(std::shared_ptr<sf::Shape> shape, sf::Vector2f velocity)
+	Entity(
+		std::shared_ptr<sf::Shape> shape,
+		sf::Vector2f velocity,
+		sf::Text name,
+		sf::Color color )
 		: m_shape(shape)
 		, m_velocity(velocity)
+		, m_name(name)
 	{
+		m_shape->setFillColor(color);
 		std::cout << "Entity initialized" << std::endl;
 	}
 
@@ -60,29 +67,57 @@ public:
 		return m_shape;
 	}
 
-	sf::Vector2f getVelocity()
+	sf::Text name() const 
 	{
-		return m_velocity;
+		return m_name;
 	}
 
-	void setXVelocity(int newVelocity)
+	void handleColisions(int width, int height) 
 	{
-		m_velocity.x = newVelocity;
-	}
+		sf::Vector2f currentPosition = m_shape->getPosition();
+		sf::FloatRect bounds = m_shape->getLocalBounds();
 
-	void setYVelocity(int newVelocity)
-	{
-		m_velocity.y = newVelocity;
+		if (currentPosition.x < 0 || currentPosition.x + bounds.width > width)
+			m_velocity.x *= -1;
+
+		if (currentPosition.y < 0 || currentPosition.y + bounds.height > height)
+			m_velocity.y *= -1;
 	}
 
 	void updatePosition()
 	{
 		const sf::Vector2f currentPosition = shape()->getPosition();
 
+		std::cout << m_velocity.x << " " << m_velocity.y << std::endl;
+
 		shape()->setPosition(
 			currentPosition.x + m_velocity.x,
 			currentPosition.y + m_velocity.y
 		);
+	}
+
+	void updateTextPosition()
+	{
+		sf::Vector2f currentShapePosition = shape()->getPosition();
+		sf::FloatRect shapeBounds = m_shape->getLocalBounds();
+		sf::FloatRect textBounds = m_name.getLocalBounds();
+
+		std::cout << textBounds.width << std::endl;
+
+		m_name.setPosition(
+			// Centering horizontally
+			(currentShapePosition.x + shapeBounds.width / 2) - textBounds.width / 2, 
+			// Centering vertically
+			(currentShapePosition.y + shapeBounds.height / 2) - (textBounds.height + (textBounds.height / 2)) 
+		);
+	}
+
+	void update(sf::RenderWindow & window) 
+	{
+		auto viewportSize = window.getView().getSize();
+		handleColisions(viewportSize.x, viewportSize.y);
+		updatePosition();
+		updateTextPosition();
 	}
 };
 
@@ -93,39 +128,32 @@ int main()
 
 	// Window config
 	sf::RenderWindow window(sf::VideoMode(width, height), "SFML works!");
-	window.setFramerateLimit(100);
+	window.setFramerateLimit(60);
+
+	// Font
+	sf::Font MyFont;
+	if (!MyFont.loadFromFile("fonts/visitor.ttf"))
+	{
+		return 1;
+	}
 
 	// FPS
 	FPS fps;
 
-	// Circle
-	const float radius = 50.f;
-	float yVelocity = 10.f;
-	float xVelocity = 5.f;
-
-	sf::CircleShape circle(radius);
-	circle.setFillColor(sf::Color::Blue);
-	circle.setPosition(width / 2, 0);
-
-	// Rect 
-	const float rectSize = 100;
-	sf::RectangleShape rectangle(sf::Vector2f(rectSize, rectSize));
-
-	rectangle.setFillColor(sf::Color::Yellow);
-	rectangle.setPosition(sf::Vector2f(50, 50));
-	float rectYVelocity = -5.f;
-	float rectXVelocity = -5.f;
-
 	// Entity
-	Entity teste(std::make_shared<sf::CircleShape>(100), sf::Vector2f(1, 1));
+	Entity teste(
+		std::make_shared<sf::RectangleShape>(sf::Vector2f(100, 100)),
+		sf::Vector2f(2, 2),
+		sf::Text("JUJU", MyFont, 24),
+		sf::Color(sf::Color::Red)
+	);
+
 
 	while (window.isOpen())
 	{
 		// FPS counter
 		fps.update();
 		fps.getFPS();
-
-
 		window.setTitle(std::to_string(fps.getFPS()));
 
 		sf::Event event;
@@ -135,66 +163,13 @@ int main()
 				window.close();
 		}
 
-		// Objects updates
-
-		// Circle updates
-		sf::Vector2f circlePosition = circle.getPosition();
-		sf::Vector2f circleTopLeft(circlePosition.x, circlePosition.y);
-		sf::Vector2f circleBottomRight(circlePosition.x + radius * 2, circlePosition.y + radius * 2);
-		if (std::round(circleBottomRight.x) > width || std::round(circleTopLeft.x) < 0)
-			xVelocity *= -1;
-		if (std::round(circleBottomRight.y) > height || std::round(circleTopLeft.y) < 0)
-			yVelocity *= -1;
-		circle.setPosition(circlePosition.x + xVelocity, circlePosition.y + yVelocity);
-
-		// Rect updates
-		sf::Vector2f rectanglePosition = rectangle.getPosition();
-		sf::Vector2f rectangleTopLeft(rectanglePosition.x, rectanglePosition.y);
-		sf::Vector2f rectangleBottomRight(rectanglePosition.x + rectSize, rectanglePosition.y + rectSize);
-		if (std::round(rectangleBottomRight.x) > width || std::round(rectangleTopLeft.x) < 0)
-			rectXVelocity *= -1;
-		if (std::round(rectangleBottomRight.y) > height || std::round(rectangleTopLeft.y) < 0)
-			rectYVelocity *= -1;
-		rectangle.setPosition(rectanglePosition.x + rectXVelocity, rectanglePosition.y + rectYVelocity);
-
-		if (rectanglePosition.x == 0 && rectanglePosition.y == 0) {
-			srand(time(NULL));
-			int blue = 0 + (rand() % 256);
-			int green = 0 + (rand() % 256);
-			int red = 0 + (rand() % 256);
-
-			rectangle.setFillColor(sf::Color(red, green, blue));
-		}
-
-		if (rectangleBottomRight.x == width && rectangleBottomRight.y == height) {
-			srand(time(NULL));
-			int blue = 0 + (rand() % 256);
-			int green = 0 + (rand() % 256);
-			int red = 0 + (rand() % 256);
-
-			rectangle.setFillColor(sf::Color(red, green, blue));
-		}
-
-		if (rectanglePosition.x == width - rectSize && rectanglePosition.y == 0) {
-			srand(time(NULL));
-			int blue = 0 + (rand() % 256);
-			int green = 0 + (rand() % 256);
-			int red = 0 + (rand() % 256);
-
-			rectangle.setFillColor(sf::Color(red, green, blue));
-		}
-
-		if (rectanglePosition.x == 0 && rectanglePosition.y == height - rectSize) {
-			srand(time(NULL));
-			int blue = 0 + (rand() % 256);
-			int green = 0 + (rand() % 256);
-			int red = 0 + (rand() % 256);
-
-			rectangle.setFillColor(sf::Color(red, green, blue));
-		}
+		// Handle updates
+		teste.update(window);
 
 		window.clear();
-		window.draw(rectangle);
+
+		window.draw(*teste.shape());
+		window.draw(teste.name());
 
 		window.display();
 	}
